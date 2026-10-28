@@ -117,7 +117,7 @@
     <button id="send" type="submit">Sign the guestbook</button>
     <p class="note" id="status" role="status"></p>
   </form>
-
+  <p class="note">Your message will be submitted publicly as a GitHub Issue and added to the guestbook.</p>
   <section id="list" aria-live="polite"></section>
 
     </main>
@@ -148,33 +148,26 @@
   var form = document.getElementById('form');
   var nameEl = document.getElementById('name');
   var msgEl = document.getElementById('msg');
-  var sendEl = document.getElementById('send');
   var statusEl = document.getElementById('status');
-  var db = null, isOwner = false, entries = [];
 
   function setStatus(t){ statusEl.textContent = t || ''; }
 
   function render(){
     listEl.textContent = '';
-    if (!entries.length){
+    if (!window.guestbookEntries || !window.guestbookEntries.length){
       var e = document.createElement('p');
       e.className = 'empty';
       e.textContent = 'No entries yet. Be the first to sign!';
       listEl.appendChild(e);
       return;
     }
-    entries.forEach(function(en){
+    window.guestbookEntries.forEach(function(en){
       var box = document.createElement('article'); box.className = 'entry';
       var meta = document.createElement('div'); meta.className = 'meta';
       var nm = document.createElement('span'); nm.className = 'name'; nm.textContent = en.name;
       var right = document.createElement('span');
-      right.textContent = new Date(en.ts).toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'});
-      if (isOwner && en.id){
-        var d = document.createElement('button'); d.className = 'del'; d.type = 'button'; d.textContent = 'delete';
-        d.onclick = function(){ db.collection('entries').doc(en.id).delete().catch(function(){ setStatus('Couldn’t delete that entry.'); }); };
-        right.appendChild(document.createTextNode(' '));
-        right.appendChild(d);
-      }
+      var date = new Date(en.created_at);
+      right.textContent = isNaN(date.getTime()) ? '' : date.toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'});
       meta.appendChild(nm); meta.appendChild(right);
       var p = document.createElement('p'); p.textContent = en.message;
       box.appendChild(meta); box.appendChild(p);
@@ -182,47 +175,33 @@
     });
   }
 
-  function localLoad(){
-    try { return JSON.parse(localStorage.getItem('guestbook-local') || '[]'); } catch(e){ return []; }
-  }
-  function localSave(){
-    try { localStorage.setItem('guestbook-local', JSON.stringify(entries)); } catch(e){}
-  }
-
   form.addEventListener('submit', function(ev){
     ev.preventDefault();
     var name = nameEl.value.trim(), message = msgEl.value.trim();
     if (!name || !message) return;
-    var entry = {name: name.slice(0,60), message: message.slice(0,500), ts: Date.now()};
-    sendEl.disabled = true; setStatus('Saving…');
-    if (db){
-      db.collection('entries').add(entry).then(function(){
-        msgEl.value = ''; setStatus('Thanks for signing!');
-      }).catch(function(){
-        setStatus('Couldn’t save. You may need Contributor access to sign.');
-      }).then(function(){ sendEl.disabled = false; });
-    } else {
-      entries.unshift(entry); localSave(); render();
-      msgEl.value = ''; setStatus('Saved on this device only.');
-      sendEl.disabled = false;
-    }
+    var title = 'Guestbook: ' + name.slice(0,60);
+    var url = new URL('https://github.com/helenlin/guestbook/issues/new');
+    url.searchParams.set('title', title);
+    url.searchParams.set('body', message.slice(0,500));
+    setStatus('Opening GitHub so you can submit your message…');
+    window.location.href = url.toString();
   });
 
   render();
-
-  if (window.claude && claude.use){
-    Promise.all([claude.use('db'), claude.use('user')]).then(function(r){
-      db = r[0];
-      if (r[1]) { try { isOwner = !!r[1].isOwner(); } catch(e){} }
-      if (!db){ entries = localLoad(); render(); setStatus('Shared storage unavailable. Entries stay on this device.'); return; }
-      db.collection('entries').orderBy('ts','desc').limit(200).onSnapshot(function(snap){
-        entries = snap.docs.map(function(d){ var x = d.data() || {}; x.id = d.id; return x; });
-        render();
-      }, function(){ setStatus('Couldn’t load entries.'); });
-    }).catch(function(){ entries = localLoad(); render(); });
-  } else {
-    entries = localLoad(); render();
-  }
+  fetch('./guestbook.json')
+    .then(function(response){
+      if (!response.ok) throw new Error('Guestbook feed request failed');
+      return response.json();
+    })
+    .then(function(entries){
+      if (!Array.isArray(entries)) throw new Error('Guestbook feed is invalid');
+      window.guestbookEntries = entries;
+      render();
+      setStatus('');
+    })
+    .catch(function(){
+      setStatus('Guestbook entries could not be loaded. Please try again later.');
+    });
 })();
 </script>
 
