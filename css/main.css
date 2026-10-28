@@ -49,8 +49,9 @@ h1{
 }
 p{
 	font-family: "helenica";
-	color: 	#7bb0ea;
-	font-size:1.2em;
+	color: 	#2441B2;
+	text-transform: uppercase;
+	font-size:2em;
 	line-height: 150%;
     padding: 35px;
 	padding-left: 55px;
@@ -114,10 +115,11 @@ a:hover{
 .navbar-default{
     background-color: transparent;
     border:none;
-    font-family: 'Open Sans';
-    font-size: 1em;
+    font-family: 'helenica';
+	text-transform: uppercase;
+    font-size: 2em;
     font-weight: 400;
-    font-color:	#504c43;
+    color:	#504c43;
 }
 .navbar-default .navbar-nav > li > a{
     color: #504c43;
